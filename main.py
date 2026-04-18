@@ -70,6 +70,18 @@ async def lifespan(app: FastAPI):
         logger.error(f"Failed to load PopularityRecommender: {e}")
         app_state["popularity"] = None
 
+    # SVD - secondary recommendation model
+    try:
+        app_state["svd"] = SVDRecommender.load("models/svd_model.pt")
+        logger.info("SVDRecommender loaded.")
+    except FileNotFoundError:
+        logger.error("models/svd_model.pt not found. "
+                     "Run python3 train_svd.py to train the SVD model.")
+        app_state["svd"] = None
+    except Exception as e:
+        logger.error(f"Failed to load SVDRecommender: {e}")
+        app_state["svd"] = None
+
     # NCF - primary recommendation model
     try:
         app_state["ncf"] = NCFRecommender.load("models/ncf_model.pt")
@@ -220,7 +232,7 @@ def _get_model(model_name: str):
     Return the requested model from app state.
 
     Args:
-        model_name: one of 'ncf', 'popularity'
+        model_name: one of 'ncf', 'svd', or 'popularity'
 
     Raises:
         HTTPException 400 if model_name is unknown
@@ -228,7 +240,8 @@ def _get_model(model_name: str):
     """
     available_models = {
         "popularity": app_state.get("popularity"),
-        "ncf": app_state.get("ncf"),
+        "svd": app_state.get("svd"),
+        "ncf": app_state.get("ncf")
     }
     if model_name not in available_models:
         raise HTTPException(
