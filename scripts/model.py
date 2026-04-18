@@ -253,9 +253,7 @@ class RatingsDataset(Dataset):
     def __init__(self, df: pd.DataFrame):
         self.user_idx = torch.tensor(df["user_idx"].values, dtype=torch.long)
         self.movie_idx = torch.tensor(df["movie_idx"].values, dtype=torch.long)
-        # Normalize ratings to [0, 1] so they match sigmoid output range
-        raw_ratings = torch.tensor(df["rating"].values, dtype=torch.float32)
-        self.ratings = normalize_ratings(raw_ratings)
+        self.ratings = torch.tensor(df["rating"].values, dtype=torch.float32)
 
     def __len__(self) -> int:
         return len(self.ratings)
@@ -434,7 +432,7 @@ class NCFRecommender:
                             shuffle=True, num_workers=0)
         
         # adding a regularizer with L2 regularization through weight_decay parameter
-        optimizer = torch.optim.Adam(self.model.parameters(), lr=self.lr, weight_decay=1e-5)
+        optimizer = torch.optim.Adam(self.model.parameters(), lr=self.lr, weight_decay=1e-6)
 
         # SmoothL1Loss (Huber loss) is better than MSELoss for discrete ratings:
         # - less sensitive to outlier ratings (e.g. troll 1-star ratings)
@@ -458,9 +456,7 @@ class NCFRecommender:
                 optimizer.zero_grad()
                 preds = self.model(user_idx, movie_idx)
 
-                # Normalize predictions to [0, 1] to match normalized targets
-                preds_norm = normalize_ratings(preds)
-                loss = criterion(preds_norm, ratings)
+                loss = criterion(preds, ratings)
                 loss.backward()
                 optimizer.step()
                 epoch_loss += loss.item()
