@@ -28,7 +28,7 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
-from scripts.model import PopularityRecommender, NCFRecommender
+from scripts.model import PopularityRecommender, SVDRecommender, NCFRecommender
 from scripts.group_aggregation import (
     compute_fairness_score,
     get_strategy,
@@ -72,7 +72,7 @@ async def lifespan(app: FastAPI):
 
     # SVD - secondary recommendation model
     try:
-        app_state["svd"] = SVDRecommender.load("models/svd_model.pt")
+        app_state["svd"] = SVDRecommender.load("models/svd_model.pkl")
         logger.info("SVDRecommender loaded.")
     except FileNotFoundError:
         logger.error("models/svd_model.pt not found. "
