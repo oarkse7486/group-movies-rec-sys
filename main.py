@@ -4,7 +4,12 @@ main.py
 FastAPI inference server for Group Rec.
 
 Runs model inference only - no training happens here.
-Models are loaded once at startup from the models/ directory.
+At startup, model artifacts are downloaded from Hugging Face Hub if they
+are not already present locally. This allows deployment on Railway and
+other cloud platforms without committing large binary files to GitHub.
+
+Models hosted at: https://huggingface.co/oarkse7486/group-rec-models
+
 SVD is excluded from deployment (685MB, too large) - the app uses NCF
 for all recommendations. Popularity model is used for candidate generation
 and as a fallback when NCF cannot score a user or movie.
@@ -27,6 +32,7 @@ import pandas as pd
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
+from huggingface_hub import hf_hub_download
 
 from scripts.model import PopularityRecommender, SVDRecommender, NCFRecommender
 from scripts.group_aggregation import (
@@ -38,6 +44,47 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
+# Hugging Face model config
+# ---------------------------------------------------------------------------
+
+HF_REPO_ID = "oarkse7486/group-rec-models"
+
+# Maps filename on Hugging Face to local path
+HF_MODEL_FILES = {
+    "popularity_baseline.pkl": "models/popularity_baseline.pkl",
+    "ncf_model.pt": "models/ncf_model.pt",
+}
+
+
+def download_models_if_missing() -> None:
+    """
+    Download model artifacts from Hugging Face Hub if not present locally.
+
+    Skips download for any file that already exists locally, so this is
+    safe to call on every startup without re-downloading unnecessarily.
+    Models are stored at: https://huggingface.co/oarkse7486/group-rec-models
+    """
+    os.makedirs("models", exist_ok=True)
+
+    for filename, local_path in HF_MODEL_FILES.items():
+        if os.path.exists(local_path):
+            logger.info(f"Model already present locally, skipping download: {local_path}")
+            continue
+
+        logger.info(f"Downloading {filename} from Hugging Face...")
+        try:
+            hf_hub_download(
+                repo_id=HF_REPO_ID,
+                filename=filename,
+                local_dir="models",
+            )
+            logger.info(f"Downloaded {filename} successfully.")
+        except Exception as e:
+            logger.error(f"Failed to download {filename} from Hugging Face: {e}. "
+                         f"Inference may fail if this model is required.")
+
+
+# ---------------------------------------------------------------------------
 # App state - models loaded once at startup
 # ---------------------------------------------------------------------------
 
@@ -47,13 +94,16 @@ app_state: Dict = {}
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """
-    Load model artifacts and movie metadata at startup.
+    Download missing model artifacts then load all components at startup.
 
     Each model is loaded inside its own try/except block so a single
     missing file does not crash the entire server. Missing models are
     logged as errors and the server starts in a degraded state rather
     than refusing to start at all.
     """
+    # Download any missing models from Hugging Face before loading
+    download_models_if_missing()
+
     logger.info("Loading models...")
 
     # Popularity baseline - required for candidate generation and fallback
@@ -70,13 +120,13 @@ async def lifespan(app: FastAPI):
         logger.error(f"Failed to load PopularityRecommender: {e}")
         app_state["popularity"] = None
 
-    # SVD - secondary recommendation model
+    # SVD - secondary recommendation model (not deployed, loads if present)
     try:
         app_state["svd"] = SVDRecommender.load("models/svd_model.pkl")
         logger.info("SVDRecommender loaded.")
     except FileNotFoundError:
-        logger.error("models/svd_model.pt not found. "
-                     "Run python3 train_svd.py to train the SVD model.")
+        logger.warning("models/svd_model.pkl not found. "
+                       "SVD is not deployed - this is expected in production.")
         app_state["svd"] = None
     except Exception as e:
         logger.error(f"Failed to load SVDRecommender: {e}")
@@ -241,7 +291,7 @@ def _get_model(model_name: str):
     available_models = {
         "popularity": app_state.get("popularity"),
         "svd": app_state.get("svd"),
-        "ncf": app_state.get("ncf")
+        "ncf": app_state.get("ncf"),
     }
     if model_name not in available_models:
         raise HTTPException(
