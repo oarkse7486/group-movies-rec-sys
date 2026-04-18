@@ -10,10 +10,9 @@ venv/
 data/raw/
 data/processed/
 
-# SVD Model (too large for git - generated via make setup)
-# models/*.pkl
-# models/*.pt
-models/svd_model.pkl
+# Models
+models/*.pkl
+models/*.pt
 
 # Outputs (generated)
 data/outputs/
