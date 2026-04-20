@@ -1,19 +1,31 @@
 # Group Rec
 
-Group Rec is a group-aware movie recommendation system that solves a genuinely hard problem: what should a group of people with different tastes watch together?
+Group Rec is a group-aware movie recommendation system that solves a genuinely hard problem: What should a group of people with different tastes watch together?
 
-Unlike traditional recommenders that optimize for a single user, Group Rec builds individual taste profiles for each member and aggregates them using three strategies - Least Misery, Average Satisfaction, and Fairness-Aware - each with different tradeoffs between accuracy and fairness.
+Unlike traditional recommenders that optimize for a single user, Group Rec builds individual taste profiles for each member and aggregates them using three strategies: Least Misery, Average Satisfaction, and Fairness-Aware, each with different tradeoffs between accuracy and fairness.
 
 ---
 
+## Live App
+
+
+Frontend: https://group-movie-rec-sys.netlify.app
+
+Backend API: https://group-movies-rec-sys-production.up.railway.app
+
+The app follows a two-service architecture. The React frontend is hosted on Netlify and the Fast API backend is hosted on Railway.
+
+**Visit the Netlify URL to use the application**
+
+---
 
 ## Features
 
 - Supports groups of 2-10 members
 - Three group aggregation strategies with plain-English explanations
-- Per-member satisfaction visualization for every recommendation
-- Group-level fairness dashboard
-- Backed by three RS models: popularity baseline, SVD, and Neural CF
+- Per-Member satisfaction visualization for every recommendation
+- Group-Level fairness dashboard with radar chart
+- Backed by three Recommender Systems models: popularity baseline, SVD, and Neural CF
 
 ---
 
@@ -24,11 +36,12 @@ group-rec/
 |-- README.md
 |-- requirements.txt
 |-- setup.py                    <- downloads data, trains and saves all models
-|-- main.py                     <- FastAPI inference server
+|-- main.py                     <- Fast API inference server
 |-- Makefile                    <- make setup | make train | make serve
 |-- evaluate.py                 <- computes RMSE, MAE, NDCG@10 for all models
 |-- experiment.py               <- sensitivity analysis: group size vs accuracy-fairness tradeoff
 |-- train_ncf.py                <- standalone NCF training script with logging
+|-- netlify.toml                <- Netlify build config for frontend deployment
 |-- scripts/
 |   |-- make_dataset.py         <- downloads and validates MovieLens 25M
 |   |-- build_features.py       <- preprocessing pipeline and train/test splits
@@ -49,14 +62,14 @@ group-rec/
 
 ---
 
-## Quickstart
+## Quick Start
 
-### 1. Install dependencies
+### 1. Install Dependencies
 ```bash
 pip install -r requirements.txt
 ```
 
-### 2. Download data, preprocess, and train all models
+### 2. Download Data, Pre-Process, and Train All Models
 ```bash
 make setup
 ```
@@ -65,7 +78,7 @@ Or run manually:
 python3 setup.py
 ```
 
-### 3. Start the API server
+### 3. Start the API Server
 ```bash
 make serve
 ```
@@ -74,7 +87,7 @@ Or:
 uvicorn main:app --reload --port 8000
 ```
 
-### 4. Run the frontend
+### 4. Run the Frontend
 ```bash
 cd frontend
 npm install
@@ -91,7 +104,8 @@ npm run dev
 | SVD | Classical Matrix Factorization | scripts/model.py -> SVDRecommender |
 | Neural CF (NCF) | Deep Learning (PyTorch) | scripts/model.py -> NCFRecommender |
 
-All three models are saved to the models/ directory after running `make setup`.
+All three models are saved to the models/ directory after running `make setup`
+Model artifacts for deployment are hosted on Hugging Face at: https://huggingface.co/oarkse7486/group-rec-models
 
 ---
 
@@ -105,7 +119,7 @@ Evaluated on the held-out test set (4,866,448 ratings, random_state=42).
 | SVD | 0.7856 | 0.5893 | 0.8165 |
 | NCF | 0.8026 | 0.5960 | 0.8168 |
 
-Run evaluation:
+Run Evaluation:
 ```bash
 python3 evaluate.py
 ```
@@ -126,9 +140,9 @@ Implemented in scripts/group_aggregation.py.
 
 ## Experiment
 
-Sensitivity analysis: how does group size (2-10 members) affect the accuracy-fairness tradeoff across aggregation strategies?
+Sensitivity Analysis: how does group size (2-10 members) affect the accuracy-fairness tradeoff across aggregation strategies?
 
-Selected results (random_state=42, N=100 groups per size):
+Selected Results (random_state=42, N=100 groups per size):
 
 | Group Size | Strategy | Avg Satisfaction | Fairness Score |
 |---|---|---|---|
@@ -155,23 +169,23 @@ python3 experiment.py
 |---|---|---|
 | POST | /recommend | Get group recommendations |
 | GET | /movies/popular | Fetch popular movies for rating UI |
-| POST | /users/profile | Build a taste profile from ratings |
 | GET | /health | Health check |
 
 ---
 
 ## Tech Stack
 
-- Backend: FastAPI, PyTorch, Surprise, Pandas
+- Backend: Fast API, PyTorch, Surprise, Pandas
 - Frontend: React, Tailwind CSS
-- Deployment: Render (API) + Vercel (frontend)
+- Deployment: Railway (API) + Netlify (frontend)
+- Model hosting: Hugging Face Hub
 - Data: MovieLens 25M + TMDB API
 
 ---
 
 ## Dataset
 
-MovieLens 25M (https://grouplens.org/datasets/movielens/25m/) - 25 million ratings, 62,000 movies, 162,000 users. Downloaded automatically via `make setup`.
+MovieLens 25M (https://grouplens.org/datasets/movielens/25m/) - 25 million ratings, 62,000 movies, 162,000 users. Downloaded automatically via `make setup`
 
 ---
 
